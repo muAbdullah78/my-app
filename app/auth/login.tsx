@@ -8,29 +8,41 @@ import TextField from '@/components/ui/TextField';
 import { useState } from 'react';
 import { ArrowLeft } from 'lucide-react-native';
 import Logo from '@/components/ui/Logo';
-import { useAuth } from '@/hooks/useAuth';
+import { signIn } from '@/lib/supabase';
 
 export default function LoginScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { signIn } = useAuth();
   
-  const [phoneNumber, setPhoneNumber] = useState('');
-  const [phoneError, setPhoneError] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
   
   const handleLogin = async () => {
-    if (!phoneNumber.trim()) {
-      setPhoneError('Phone number is required');
+    if (!email.trim() || !password.trim()) {
+      setError('Please fill in all fields');
       return;
     }
     
-    setPhoneError('');
+    setError('');
+    setLoading(true);
     
     try {
-      await signIn(phoneNumber);
-      router.push('/auth/verify');
-    } catch (error) {
-      setPhoneError('Invalid phone number');
+      const { data, error } = await signIn(email, password);
+      
+      if (error) throw error;
+      
+      // Navigate based on user type
+      if (data.user?.user_metadata?.user_type === 'shop_owner') {
+        router.replace('/(tabs)/shop');
+      } else {
+        router.replace('/(tabs)');
+      }
+    } catch (error: any) {
+      setError(error.message || 'Failed to sign in');
+    } finally {
+      setLoading(false);
     }
   };
   
@@ -56,25 +68,35 @@ export default function LoginScreen() {
           <Logo size={56} />
           <Text style={styles.title}>Welcome Back</Text>
           <Text style={styles.subtitle}>
-            Enter your phone number to continue
+            Sign in to your account
           </Text>
         </View>
         
         <View style={styles.form}>
           <TextField
-            label="Phone Number"
-            placeholder="Enter your phone number"
-            keyboardType="phone-pad"
-            value={phoneNumber}
-            onChangeText={setPhoneNumber}
-            error={phoneError}
+            label="Email"
+            placeholder="Enter your email"
+            keyboardType="email-address"
+            value={email}
+            onChangeText={setEmail}
+            autoCapitalize="none"
             autoFocus
           />
           
+          <TextField
+            label="Password"
+            placeholder="Enter your password"
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
+            error={error}
+          />
+          
           <Button 
-            text="Continue" 
+            text={loading ? "Signing in..." : "Sign In"} 
             onPress={handleLogin} 
             style={styles.button}
+            disabled={loading}
           />
           
           <Text style={styles.termsText}>

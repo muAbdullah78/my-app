@@ -8,19 +8,18 @@ import TextField from '@/components/ui/TextField';
 import { useState } from 'react';
 import { ArrowLeft } from 'lucide-react-native';
 import Logo from '@/components/ui/Logo';
-import { useAuth } from '@/hooks/useAuth';
+import { signUp } from '@/lib/supabase';
 
 export default function RegisterScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { signUp } = useAuth();
   
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
-  const [phoneNumber, setPhoneNumber] = useState('');
-  const [nameError, setNameError] = useState('');
-  const [emailError, setEmailError] = useState('');
-  const [phoneError, setPhoneError] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
   
   const validateEmail = (email: string) => {
     const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -28,39 +27,52 @@ export default function RegisterScreen() {
   };
   
   const handleRegister = async () => {
-    let hasError = false;
+    setError('');
     
+    // Validation
     if (!name.trim()) {
-      setNameError('Name is required');
-      hasError = true;
-    } else {
-      setNameError('');
+      setError('Name is required');
+      return;
     }
     
     if (!email.trim()) {
-      setEmailError('Email is required');
-      hasError = true;
-    } else if (!validateEmail(email)) {
-      setEmailError('Invalid email format');
-      hasError = true;
-    } else {
-      setEmailError('');
+      setError('Email is required');
+      return;
     }
     
-    if (!phoneNumber.trim()) {
-      setPhoneError('Phone number is required');
-      hasError = true;
-    } else {
-      setPhoneError('');
+    if (!validateEmail(email)) {
+      setError('Invalid email format');
+      return;
     }
     
-    if (hasError) return;
+    if (!password.trim()) {
+      setError('Password is required');
+      return;
+    }
+    
+    if (password.length < 6) {
+      setError('Password must be at least 6 characters');
+      return;
+    }
+    
+    if (password !== confirmPassword) {
+      setError('Passwords do not match');
+      return;
+    }
+    
+    setLoading(true);
     
     try {
-      await signUp({ name, email, phoneNumber });
-      router.push('/auth/verify');
-    } catch (error) {
-      // Handle registration error
+      const { data, error } = await signUp(email, password, 'customer');
+      
+      if (error) throw error;
+      
+      // Navigate to role selection or directly to main app
+      router.replace('/auth/role-selection');
+    } catch (error: any) {
+      setError(error.message || 'Failed to create account');
+    } finally {
+      setLoading(false);
     }
   };
   
@@ -96,7 +108,6 @@ export default function RegisterScreen() {
             placeholder="Enter your full name"
             value={name}
             onChangeText={setName}
-            error={nameError}
             autoFocus
           />
           
@@ -106,22 +117,31 @@ export default function RegisterScreen() {
             keyboardType="email-address"
             value={email}
             onChangeText={setEmail}
-            error={emailError}
+            autoCapitalize="none"
           />
           
           <TextField
-            label="Phone Number"
-            placeholder="Enter your phone number"
-            keyboardType="phone-pad"
-            value={phoneNumber}
-            onChangeText={setPhoneNumber}
-            error={phoneError}
+            label="Password"
+            placeholder="Enter your password"
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
+          />
+          
+          <TextField
+            label="Confirm Password"
+            placeholder="Confirm your password"
+            value={confirmPassword}
+            onChangeText={setConfirmPassword}
+            secureTextEntry
+            error={error}
           />
           
           <Button 
-            text="Continue" 
+            text={loading ? "Creating Account..." : "Create Account"} 
             onPress={handleRegister} 
             style={styles.button}
+            disabled={loading}
           />
           
           <Text style={styles.termsText}>

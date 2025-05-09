@@ -4,29 +4,54 @@ import { colors } from '@/constants/colors';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { useAuth } from '@/hooks/useAuth';
 import Button from '@/components/ui/Button';
 import { User, Store } from 'lucide-react-native';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
+import { supabase } from '@/lib/supabase';
 
 type UserRole = 'customer' | 'shop_owner';
 
 export default function RoleSelectionScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { setUserRole } = useAuth();
   
   const [selectedRole, setSelectedRole] = useState<UserRole | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
   
   const handleRoleSelection = (role: UserRole) => {
     setSelectedRole(role);
+    setError('');
   };
   
   const handleContinue = async () => {
     if (!selectedRole) return;
     
-    await setUserRole(selectedRole);
-    router.replace('/(tabs)');
+    setLoading(true);
+    setError('');
+    
+    try {
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      
+      if (userError) throw userError;
+      
+      const { error: updateError } = await supabase.auth.updateUser({
+        data: { user_type: selectedRole }
+      });
+      
+      if (updateError) throw updateError;
+      
+      // Navigate based on role
+      if (selectedRole === 'shop_owner') {
+        router.replace('/(tabs)/shop');
+      } else {
+        router.replace('/(tabs)');
+      }
+    } catch (error: any) {
+      setError(error.message || 'Failed to update role');
+    } finally {
+      setLoading(false);
+    }
   };
   
   return (
@@ -90,11 +115,15 @@ export default function RoleSelectionScreen() {
         </Animated.View>
       </View>
       
+      {error ? (
+        <Text style={styles.errorText}>{error}</Text>
+      ) : null}
+      
       <Animated.View entering={FadeIn.delay(600)} style={styles.footer}>
         <Button
-          text="Continue"
+          text={loading ? "Updating..." : "Continue"}
           onPress={handleContinue}
-          disabled={!selectedRole}
+          disabled={!selectedRole || loading}
         />
         <Text style={styles.noteText}>
           You can change your role later in your profile settings
@@ -182,5 +211,12 @@ const styles = StyleSheet.create({
     color: colors.textLight,
     textAlign: 'center',
     marginTop: 16,
+  },
+  errorText: {
+    fontFamily: 'Poppins-Regular',
+    fontSize: 14,
+    color: colors.error,
+    textAlign: 'center',
+    marginBottom: 16,
   },
 });

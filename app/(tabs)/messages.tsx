@@ -1,25 +1,153 @@
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Image } from 'react-native';
-import { useState } from 'react';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
+import { useState, useEffect } from 'react';
 import { colors } from '@/constants/colors';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { chats } from '@/data/mockData';
 import { useRouter } from 'expo-router';
 import { Search } from 'lucide-react-native';
 import EmptyState from '@/components/ui/EmptyState';
 import SearchBar from '@/components/ui/SearchBar';
+import { supabase } from '@/lib/supabase';
+import Button from '@/components/ui/Button';
+
+type Chat = {
+  id: string;
+  user_id: string;
+  shop_id: string;
+  last_message: string;
+  last_message_time: string;
+  unread_count: number;
+  shop: {
+    name: string;
+    avatar_url: string;
+  };
+};
 
 export default function MessagesScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const [searchVisible, setSearchVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [chats, setChats] = useState<Chat[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    fetchChats();
+  }, []);
+
+  const fetchChats = async () => {
+    try {
+      setLoading(true);
+      setError('');
+
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError) throw userError;
+
+      const { data, error: chatsError } = await supabase
+        .from('chats')
+        .select(`
+          *,
+          shop:shops(name, avatar_url)
+        `)
+        .eq('user_id', user?.id)
+        .order('last_message_time', { ascending: false });
+
+      if (chatsError) throw chatsError;
+
+      setChats(data || []);
+    } catch (error: any) {
+      setError(error.message || 'Failed to fetch chats');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const filteredChats = chats.filter(chat => 
-    chat.name.toLowerCase().includes(searchQuery.toLowerCase())
+    chat.shop.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const navigateToChat = (chatId: string) => {
     router.push(`/chat/${chatId}`);
+  };
+
+  const renderContent = () => {
+    if (loading) {
+      return (
+        <View style={styles.centerContainer}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={styles.loadingText}>Loading conversations...</Text>
+        </View>
+      );
+    }
+
+    if (error) {
+      return (
+        <View style={styles.centerContainer}>
+          <Text style={styles.errorText}>{error}</Text>
+          <Button 
+            text="Try Again"
+            onPress={fetchChats}
+            style={styles.retryButton}
+          />
+        </View>
+      );
+    }
+
+    if (filteredChats.length === 0) {
+      return (
+        <EmptyState
+          title="No conversations"
+          description={searchQuery ? "No matches found" : "You don't have any messages yet"}
+          icon="message-square"
+        />
+      );
+    }
+
+    return (
+      <FlatList
+        data={filteredChats}
+        keyExtractor={(item) => item.id}
+        renderItem={({ item }) => (
+          <TouchableOpacity 
+            style={styles.chatItem} 
+            onPress={() => navigateToChat(item.id)}
+            activeOpacity={0.7}
+          >
+            <View style={styles.chatAvatar}>
+              <Image 
+                source={{ uri: item.shop.avatar_url }} 
+                style={styles.avatarImage}
+                defaultSource={require('@/assets/images/default-avatar.png')}
+              />
+              {item.unread_count > 0 && (
+                <View style={styles.unreadBadge}>
+                  <Text style={styles.unreadCount}>
+                    {item.unread_count > 9 ? '9+' : item.unread_count}
+                  </Text>
+                </View>
+              )}
+            </View>
+            <View style={styles.chatInfo}>
+              <View style={styles.chatHeader}>
+                <Text style={styles.chatName}>{item.shop.name}</Text>
+                <Text style={styles.chatTime}>{item.last_message_time}</Text>
+              </View>
+              <Text 
+                style={[
+                  styles.lastMessage, 
+                  item.unread_count > 0 && styles.unreadMessage
+                ]}
+                numberOfLines={1}
+              >
+                {item.last_message}
+              </Text>
+            </View>
+          </TouchableOpacity>
+        )}
+        contentContainerStyle={styles.chatsList}
+        showsVerticalScrollIndicator={false}
+      />
+    );
   };
 
   return (
@@ -49,53 +177,7 @@ export default function MessagesScreen() {
         )}
       </View>
 
-      {filteredChats.length > 0 ? (
-        <FlatList
-          data={filteredChats}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <TouchableOpacity 
-              style={styles.chatItem} 
-              onPress={() => navigateToChat(item.id)}
-              activeOpacity={0.7}
-            >
-              <View style={styles.chatAvatar}>
-                <Image source={{ uri: item.avatar }} style={styles.avatarImage} />
-                {item.unreadCount > 0 && (
-                  <View style={styles.unreadBadge}>
-                    <Text style={styles.unreadCount}>
-                      {item.unreadCount > 9 ? '9+' : item.unreadCount}
-                    </Text>
-                  </View>
-                )}
-              </View>
-              <View style={styles.chatInfo}>
-                <View style={styles.chatHeader}>
-                  <Text style={styles.chatName}>{item.name}</Text>
-                  <Text style={styles.chatTime}>{item.lastMessageTime}</Text>
-                </View>
-                <Text 
-                  style={[
-                    styles.lastMessage, 
-                    item.unreadCount > 0 && styles.unreadMessage
-                  ]}
-                  numberOfLines={1}
-                >
-                  {item.lastMessage}
-                </Text>
-              </View>
-            </TouchableOpacity>
-          )}
-          contentContainerStyle={styles.chatsList}
-          showsVerticalScrollIndicator={false}
-        />
-      ) : (
-        <EmptyState
-          title="No conversations"
-          description={searchQuery ? "No matches found" : "You don't have any messages yet"}
-          icon="message-square"
-        />
-      )}
+      {renderContent()}
     </View>
   );
 }
@@ -192,5 +274,27 @@ const styles = StyleSheet.create({
   unreadMessage: {
     fontFamily: 'Poppins-Medium',
     color: colors.text,
+  },
+  centerContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  loadingText: {
+    fontFamily: 'Poppins-Medium',
+    fontSize: 16,
+    color: colors.text,
+    marginTop: 12,
+  },
+  errorText: {
+    fontFamily: 'Poppins-Medium',
+    fontSize: 16,
+    color: colors.error,
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  retryButton: {
+    minWidth: 120,
   },
 });

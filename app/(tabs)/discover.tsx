@@ -1,20 +1,32 @@
-import { View, Text, StyleSheet, TouchableOpacity, FlatList, Platform } from 'react-native';
-import { useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, FlatList, Platform, ActivityIndicator } from 'react-native';
+import { useState, useEffect } from 'react';
 import { colors } from '@/constants/colors';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import SearchBar from '@/components/ui/SearchBar';
 import ShopCard from '@/components/shops/ShopCard';
 import { Map, List } from 'lucide-react-native';
-import { shops } from '@/data/mockData';
 import FilterModal from '@/components/shops/FilterModal';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import Button from '@/components/ui/Button';
+import { supabase } from '@/lib/supabase';
 
 // Only import MapView on mobile platforms
 let MapViewComponent: any = null;
 if (Platform.OS !== 'web') {
   MapViewComponent = require('@/components/shops/MapView').default;
 }
+
+type Shop = {
+  id: string;
+  name: string;
+  address: string;
+  rating: number;
+  services: string[];
+  price_range: [number, number];
+  latitude: number;
+  longitude: number;
+  image_url: string;
+};
 
 export default function DiscoverScreen() {
   const insets = useSafeAreaInsets();
@@ -27,6 +39,33 @@ export default function DiscoverScreen() {
     priceRange: [0, 100],
     distance: 5,
   });
+  
+  const [shops, setShops] = useState<Shop[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    fetchShops();
+  }, []);
+
+  const fetchShops = async () => {
+    try {
+      setLoading(true);
+      setError('');
+      
+      const { data, error } = await supabase
+        .from('shops')
+        .select('*');
+        
+      if (error) throw error;
+      
+      setShops(data || []);
+    } catch (error: any) {
+      setError(error.message || 'Failed to fetch shops');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const toggleViewMode = () => {
     if (Platform.OS === 'web' && viewMode === 'list') {
@@ -61,6 +100,54 @@ export default function DiscoverScreen() {
     return MapViewComponent ? <MapViewComponent shops={shops} /> : null;
   };
 
+  const renderContent = () => {
+    if (loading) {
+      return (
+        <View style={styles.centerContainer}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={styles.loadingText}>Loading shops...</Text>
+        </View>
+      );
+    }
+
+    if (error) {
+      return (
+        <View style={styles.centerContainer}>
+          <Text style={styles.errorText}>{error}</Text>
+          <Button 
+            text="Try Again"
+            onPress={fetchShops}
+            style={styles.retryButton}
+          />
+        </View>
+      );
+    }
+
+    if (shops.length === 0) {
+      return (
+        <View style={styles.centerContainer}>
+          <Text style={styles.emptyText}>No shops found</Text>
+        </View>
+      );
+    }
+
+    return viewMode === 'list' ? (
+      <Animated.View entering={FadeIn.duration(300)} style={styles.listContainer}>
+        <FlatList
+          data={shops}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item }) => <ShopCard shop={item} />}
+          contentContainerStyle={styles.shopsList}
+          showsVerticalScrollIndicator={false}
+        />
+      </Animated.View>
+    ) : (
+      <Animated.View entering={FadeIn.duration(300)} style={styles.mapContainer}>
+        {renderMapView()}
+      </Animated.View>
+    );
+  };
+
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.header}>
@@ -90,21 +177,7 @@ export default function DiscoverScreen() {
         </View>
       </View>
 
-      {viewMode === 'list' ? (
-        <Animated.View entering={FadeIn.duration(300)} style={styles.listContainer}>
-          <FlatList
-            data={shops}
-            keyExtractor={(item) => item.id.toString()}
-            renderItem={({ item }) => <ShopCard shop={item} />}
-            contentContainerStyle={styles.shopsList}
-            showsVerticalScrollIndicator={false}
-          />
-        </Animated.View>
-      ) : (
-        <Animated.View entering={FadeIn.duration(300)} style={styles.mapContainer}>
-          {renderMapView()}
-        </Animated.View>
-      )}
+      {renderContent()}
 
       <FilterModal
         visible={filterModalVisible}
@@ -176,5 +249,33 @@ const styles = StyleSheet.create({
   },
   webMapButton: {
     minWidth: 200,
+  },
+  centerContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  loadingText: {
+    fontFamily: 'Poppins-Medium',
+    fontSize: 16,
+    color: colors.text,
+    marginTop: 12,
+  },
+  errorText: {
+    fontFamily: 'Poppins-Medium',
+    fontSize: 16,
+    color: colors.error,
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  emptyText: {
+    fontFamily: 'Poppins-Medium',
+    fontSize: 16,
+    color: colors.textLight,
+    textAlign: 'center',
+  },
+  retryButton: {
+    minWidth: 120,
   },
 });

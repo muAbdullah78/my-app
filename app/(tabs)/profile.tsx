@@ -1,18 +1,93 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Switch } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Switch, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '@/constants/colors';
-import { useState } from 'react';
-import { useAuth } from '@/hooks/useAuth';
+import { useState, useEffect } from 'react';
 import { 
   User, Settings, CreditCard, MapPin, Bell, MessageSquare, Shield, LogOut
 } from 'lucide-react-native';
 import Button from '@/components/ui/Button';
 import ProfileMenuButton from '@/components/profile/ProfileMenuButton';
+import { supabase } from '@/lib/supabase';
+import { useRouter } from 'expo-router';
+
+type UserProfile = {
+  id: string;
+  email: string;
+  full_name: string;
+  avatar_url: string | null;
+  user_type: 'customer' | 'shop_owner';
+  created_at: string;
+};
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
-  const { user, userRole, signOut } = useAuth();
+  const router = useRouter();
   const [darkMode, setDarkMode] = useState(false);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchProfile();
+  }, []);
+
+  const fetchProfile = async () => {
+    try {
+      setLoading(true);
+      
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError) throw userError;
+
+      const { data, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user?.id)
+        .single();
+
+      if (profileError) throw profileError;
+
+      setProfile(data);
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to fetch profile');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSignOut = async () => {
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      
+      router.replace('/auth/login');
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to sign out');
+    }
+  };
+
+  const handleUpdateProfile = async (updates: Partial<UserProfile>) => {
+    try {
+      if (!profile) return;
+
+      const { error } = await supabase
+        .from('profiles')
+        .update(updates)
+        .eq('id', profile.id);
+
+      if (error) throw error;
+
+      setProfile(prev => prev ? { ...prev, ...updates } : null);
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to update profile');
+    }
+  };
+
+  if (loading) {
+    return (
+      <View style={[styles.container, styles.centerContainer]}>
+        <Text style={styles.loadingText}>Loading profile...</Text>
+      </View>
+    );
+  }
 
   return (
     <ScrollView 
@@ -29,8 +104,8 @@ export default function ProfileScreen() {
 
       <View style={styles.profileCard}>
         <View style={styles.avatarContainer}>
-          {user?.photoURL ? (
-            <Image source={{ uri: user.photoURL }} style={styles.avatar} />
+          {profile?.avatar_url ? (
+            <Image source={{ uri: profile.avatar_url }} style={styles.avatar} />
           ) : (
             <View style={styles.avatarPlaceholder}>
               <User size={36} color={colors.primary} />
@@ -41,10 +116,10 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         </View>
         <View style={styles.profileInfo}>
-          <Text style={styles.profileName}>{user?.name || 'Guest User'}</Text>
-          <Text style={styles.profileEmail}>{user?.email || 'guest@example.com'}</Text>
+          <Text style={styles.profileName}>{profile?.full_name || 'Guest User'}</Text>
+          <Text style={styles.profileEmail}>{profile?.email || 'guest@example.com'}</Text>
           <Text style={styles.profileRole}>
-            {userRole === 'shop_owner' ? 'Shop Owner' : 'Customer'}
+            {profile?.user_type === 'shop_owner' ? 'Shop Owner' : 'Customer'}
           </Text>
         </View>
       </View>
@@ -116,7 +191,7 @@ export default function ProfileScreen() {
         text="Sign Out"
         variant="outline"
         icon={LogOut}
-        onPress={signOut}
+        onPress={handleSignOut}
         style={styles.signOutButton}
       />
     </ScrollView>
@@ -131,6 +206,15 @@ const styles = StyleSheet.create({
   contentContainer: {
     padding: 16,
     paddingBottom: 40,
+  },
+  centerContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    fontFamily: 'Poppins-Medium',
+    fontSize: 16,
+    color: colors.text,
   },
   header: {
     flexDirection: 'row',

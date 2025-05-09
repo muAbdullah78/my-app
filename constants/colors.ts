@@ -1,33 +1,41 @@
 export const colors = {
   // Base colors
-  primary: '#3B82F6', // Blue
-  primaryLight: '#EFF6FF',
-  primaryDark: '#2563EB',
+  primary: '#007AFF', // Blue
+  primaryLight: '#4DA3FF',
+  primaryDark: '#0055B3',
   
-  secondary: '#8B5CF6', // Violet
-  secondaryLight: '#F5F3FF',
-  secondaryDark: '#7C3AED',
+  secondary: '#5856D6', // Violet
+  secondaryLight: '#7A79E0',
+  secondaryDark: '#3E3D96',
   
-  accent: '#F472B6', // Pink
-  accentLight: '#FCE7F3',
-  accentDark: '#EC4899',
+  accent: '#FF2D55', // Pink
+  accentLight: '#FF5C7C',
+  accentDark: '#B31F3B',
   
   // Status colors
-  success: '#10B981', // Green
-  successLight: '#ECFDF5',
+  success: '#34C759', // Green
+  successLight: '#5CD679',
+  successDark: '#248A3D',
   
-  warning: '#F59E0B', // Amber
-  warningLight: '#FFFBEB',
+  warning: '#FF9500', // Amber
+  warningLight: '#FFAA33',
+  warningDark: '#B36800',
   
-  error: '#EF4444', // Red
-  errorLight: '#FEF2F2',
+  error: '#FF3B30', // Red
+  errorLight: '#FF6961',
+  errorDark: '#B32921',
+  
+  info: '#5AC8FA',
+  infoLight: '#7DD4FB',
+  infoDark: '#3F8CAF',
   
   // Grey palette
-  text: '#1F2937',
-  textLight: '#6B7280',
-  border: '#E5E7EB',
+  text: '#000000',
+  textLight: '#8E8E93',
+  border: '#C6C6C8',
   light: '#F9FAFB',
-  background: '#F3F4F6',
+  background: '#FFFFFF',
+  surface: '#F2F2F7',
   white: '#FFFFFF',
   
   // Dark mode
@@ -37,4 +45,9 @@ export const colors = {
   // Utility
   shadow: '#000000',
   transparent: 'transparent',
+  
+  disabled: '#C7C7CC',
+  placeholder: '#8E8E93',
+  backdrop: 'rgba(0, 0, 0, 0.5)',
+  notification: '#FF3B30',
 };
