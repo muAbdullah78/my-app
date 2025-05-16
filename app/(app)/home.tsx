@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, FlatList, RefreshControl } from 'react-native';
 import { Text, Searchbar, Card, Button, ActivityIndicator } from 'react-native-paper';
 import { useRouter } from 'expo-router';
-import * as Location from 'expo-location';
+// REMOVED: import * as Location from 'expo-location'; // Removed this line
 import { supabase } from '../../lib/supabase';
 
 type Shop = {
@@ -12,7 +12,7 @@ type Shop = {
   address: string;
   rating: number;
   total_ratings: number;
-  distance?: number;
+  // REMOVED: distance?: number; // Removed this property
 };
 
 export default function Home() {
@@ -21,25 +21,10 @@ export default function Home() {
   const [shops, setShops] = useState<Shop[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [location, setLocation] = useState<Location.LocationObject | null>(null);
-  const [error, setError] = useState('');
+  // REMOVED: const [location, setLocation] = useState<Location.LocationObject | null>(null); // Removed this state
+  const [error, setError] = useState(''); // Keep this for other errors
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const { status } = await Location.requestForegroundPermissionsAsync();
-        if (status !== 'granted') {
-          setError('Location permission denied');
-          return;
-        }
-
-        const location = await Location.getCurrentPositionAsync({});
-        setLocation(location);
-      } catch (err) {
-        setError('Failed to get location');
-      }
-    })();
-  }, []);
+  // REMOVED: useEffect hook for fetching location (lines 23-34 in original)
 
   const fetchShops = async () => {
     try {
@@ -59,30 +44,13 @@ export default function Home() {
 
       if (error) throw error;
 
-      // Calculate distances if location is available
-      const shopsWithDistance = location
-        ? data.map((shop: Shop) => ({
-            ...shop,
-            distance: calculateDistance(
-              location.coords.latitude,
-              location.coords.longitude,
-              shop.location.coordinates[1],
-              shop.location.coordinates[0]
-            ),
-          }))
-        : data;
+      // REMOVED: Logic to calculate and sort by distance (lines 54-66 in original)
+      // Replaced with:
+      setShops(data as Shop[]);
 
-      // Sort by distance if available
-      const sortedShops = shopsWithDistance.sort((a: Shop, b: Shop) => {
-        if (a.distance && b.distance) {
-          return a.distance - b.distance;
-        }
-        return 0;
-      });
-
-      setShops(sortedShops);
     } catch (err) {
-      setError('Failed to fetch shops');
+      // If error has a message property, use it, otherwise use a generic message
+      setError(err instanceof Error ? err.message : 'Failed to fetch shops');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -91,33 +59,21 @@ export default function Home() {
 
   useEffect(() => {
     fetchShops();
-  }, [searchQuery]);
+  }, [searchQuery]); // Keep searchQuery as dependency
 
   const onRefresh = () => {
     setRefreshing(true);
     fetchShops();
   };
 
-  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
-    const R = 6371; // Earth's radius in km
-    const dLat = toRad(lat2 - lat1);
-    const dLon = toRad(lon2 - lon1);
-    const a =
-      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c;
-  };
-
-  const toRad = (value: number) => {
-    return (value * Math.PI) / 180;
-  };
+  // REMOVED: calculateDistance and toRad helper functions (lines 68-86 in original)
 
   const renderShopCard = ({ item }: { item: Shop }) => (
     <Card style={styles.card} onPress={() => router.push(`/shop/${item.id}`)}>
       <Card.Title
         title={item.name}
-        subtitle={item.distance ? `${item.distance.toFixed(1)} km away` : item.address}
+        // MODIFIED: Removed distance check, now just shows address
+        subtitle={item.address}
       />
       <Card.Content>
         <Text numberOfLines={2}>{item.description}</Text>
@@ -150,12 +106,12 @@ export default function Home() {
       />
 
       {error ? (
-        <Text style={styles.error}>{error}</Text>
+        <Text style={styles.error}>Error: {error}</Text> // Added "Error: " prefix
       ) : (
         <FlatList
           data={shops}
           renderItem={renderShopCard}
-          keyExtractor={(item) => item.id}
+          keyExtractor={(item) => item.id.toString()} // Ensure key is a string
           contentContainerStyle={styles.list}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
@@ -202,4 +158,4 @@ const styles = StyleSheet.create({
     marginTop: 32,
     color: '#666',
   },
-}); 
+});

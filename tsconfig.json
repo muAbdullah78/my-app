@@ -2,7 +2,10 @@
   "compilerOptions": {
     "target": "ES2015",
     "module": "commonjs",
-    "lib": ["ES2015", "DOM"],
+    "lib": [
+      "ES2015",
+      "DOM"
+    ],
     "jsx": "react-native",
     "strict": true,
     "esModuleInterop": true,
@@ -14,7 +17,9 @@
     "noEmit": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./*"]
+      "@/*": [
+        "./*"
+      ]
     }
   },
   "include": [
@@ -26,5 +31,6 @@
     "babel.config.js",
     "metro.config.js",
     "jest.config.js"
-  ]
+  ],
+  "extends": "expo/tsconfig.base"
 }
